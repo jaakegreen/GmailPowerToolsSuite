@@ -202,6 +202,66 @@ function LabelDot({ color, size = 8 }: { color: string; size?: number }) {
   )
 }
 
+interface SelectOption { value: string; label: string; color?: string }
+
+function CustomSelect({ value, onChange, options, placeholder }: {
+  value: string
+  onChange: (v: string) => void
+  options: SelectOption[]
+  placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const selected = options.find(o => o.value === value)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors hover:border-gray-400"
+      >
+        {selected?.color && <LabelDot color={selected.color} size={8} />}
+        <span className={`flex-1 truncate ${selected ? 'text-gray-800' : 'text-gray-400'}`}>
+          {selected?.label ?? placeholder ?? 'Select…'}
+        </span>
+        <svg viewBox="0 0 16 16" className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2}>
+          <polyline points="3,6 8,10 13,6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1.5 w-full bg-white rounded-xl py-1 overflow-y-auto max-h-48"
+          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.06)' }}>
+          {options.map(o => (
+            <button
+              key={o.value} type="button"
+              onClick={() => { onChange(o.value); setOpen(false) }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
+                o.value === value ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {o.color && <LabelDot color={o.color} size={8} />}
+              <span className="flex-1 truncate">{o.label}</span>
+              {o.value === value && (
+                <svg viewBox="0 0 12 12" className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <polyline points="2,6 5,9 10,3" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function LabelChip({ label }: { label: Label }) {
   return (
     <span
@@ -249,6 +309,7 @@ interface TreeDragHandlers {
 
 function LabelTreeItem({
   label, depth = 0, onToggle, onEdit, editingId,
+  selectedIds, onSelectToggle, onClearSelection,
   draggingId, dragOver,
   onItemDragStart, onItemDragOver, onItemDrop, onItemDragEnd,
 }: {
@@ -257,6 +318,9 @@ function LabelTreeItem({
   onToggle: (id: string) => void
   onEdit?: (id: string) => void
   editingId?: string | null
+  selectedIds?: Set<string>
+  onSelectToggle?: (id: string) => void
+  onClearSelection?: () => void
   draggingId: string | null
   dragOver: DragOverState | null
 } & TreeDragHandlers) {
@@ -265,6 +329,7 @@ function LabelTreeItem({
   const isDragging = draggingId === label.id
   const isOver = dragOver?.id === label.id
   const isEditing = editingId === label.id
+  const isSelected = selectedIds?.has(label.id) ?? false
 
   const handlers: TreeDragHandlers = { onItemDragStart, onItemDragOver, onItemDrop, onItemDragEnd }
 
@@ -283,10 +348,15 @@ function LabelTreeItem({
         }}
         onDrop={e => { e.preventDefault(); e.stopPropagation(); onItemDrop(label.id) }}
         onDragEnd={onItemDragEnd}
-        onClick={e => { if (onEdit) { e.stopPropagation(); onEdit(label.id) } }}
-        className={`flex items-center gap-1.5 py-1.5 rounded-md select-none group transition-colors cursor-pointer ${
+        onClick={e => {
+          e.stopPropagation()
+          if (e.shiftKey && onSelectToggle) { onSelectToggle(label.id); return }
+          if ((selectedIds?.size ?? 0) > 0 && onClearSelection) { onClearSelection(); return }
+          if (onEdit) onEdit(label.id)
+        }}
+        className={`flex items-center gap-1.5 py-1.5 rounded-md select-none group/row transition-colors cursor-pointer ${
           isDragging ? 'opacity-30' : ''
-        } ${isEditing ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : isOver && dragOver?.pos === 'inside' ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'hover:bg-gray-50'}`}
+        } ${isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : isEditing ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : isOver && dragOver?.pos === 'inside' ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'hover:bg-gray-50'}`}
         style={{ paddingLeft: depth === 0 ? 8 : 20, paddingRight: 12 }}
       >
         {hasChildren ? (
@@ -313,6 +383,7 @@ function LabelTreeItem({
       {hasChildren && label.expanded && !isDragging && label.children!.map(child => (
         <LabelTreeItem
           key={child.id} label={child} depth={depth + 1} onToggle={onToggle} onEdit={onEdit} editingId={editingId}
+          selectedIds={selectedIds} onSelectToggle={onSelectToggle} onClearSelection={onClearSelection}
           draggingId={draggingId} dragOver={dragOver}
           {...handlers}
         />
@@ -404,6 +475,8 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState(GMAIL_COLORS[0])
   const [editChildren, setEditChildren] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchSelColor, setBatchSelColor] = useState(GMAIL_COLORS[0])
 
   const toggleExpanded = useCallback((id: string) => {
     const toggle = (items: Label[]): Label[] =>
@@ -427,6 +500,25 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
   }, [draggingId, dragOver, labels, onLabelsChange, handleDragEnd])
 
   const allFlat = flattenLabels(labels)
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const applyBatchColor = () => {
+    const applyInTree = (items: Label[]): Label[] =>
+      items.map(l => ({
+        ...l,
+        ...(selectedIds.has(l.id) ? { color: batchSelColor.bg, textColor: batchSelColor.text } : {}),
+        children: l.children ? applyInTree(l.children) : undefined,
+      }))
+    onLabelsChange(applyInTree(labels))
+    setSelectedIds(new Set())
+  }
 
   function handleCreateSingle() {
     if (!labelName.trim()) return
@@ -529,21 +621,42 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
           {labels.map(label => (
             <LabelTreeItem
               key={label.id} label={label} onToggle={toggleExpanded} onEdit={startEdit} editingId={editingLabelId}
+              selectedIds={selectedIds} onSelectToggle={toggleSelect} onClearSelection={() => setSelectedIds(new Set())}
               draggingId={draggingId} dragOver={dragOver}
               onItemDragStart={handleDragStart} onItemDragOver={handleDragOver}
               onItemDrop={handleDrop} onItemDragEnd={handleDragEnd}
             />
           ))}
         </div>
+
         <div className="px-4 py-3 border-t border-gray-100">
-          <div className="text-xs text-gray-400">{totalLabels} labels total</div>
+          <div className="text-xs text-gray-400">{selectedIds.size > 0 ? `${selectedIds.size} selected — shift+click to add` : `${totalLabels} labels total`}</div>
         </div>
       </div>
 
-      {/* Right panel — click padding area to deselect label */}
-      <div className="flex-1 overflow-y-auto p-8" onClick={() => cancelEdit()}>
+      {/* Right panel */}
+      <div className="flex-1 overflow-y-auto p-8" onClick={() => { cancelEdit(); setSelectedIds(new Set()) }}>
         <div className="max-w-2xl" onClick={e => e.stopPropagation()}>
-          {editingLabelId ? (
+          {selectedIds.size > 0 ? (
+            <div key="batch" className="panel-in">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-1">Change Color</h2>
+              <p className="text-sm text-gray-500 mb-6">{selectedIds.size} label{selectedIds.size > 1 ? 's' : ''} selected — shift+click to add or remove.</p>
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Pick a color</label>
+                  <ColorPicker selected={batchSelColor.bg} onSelect={setBatchSelColor} />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={applyBatchColor} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">
+                    Apply to {selectedIds.size} label{selectedIds.size > 1 ? 's' : ''}
+                  </button>
+                  <button onClick={() => setSelectedIds(new Set())} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : editingLabelId ? (
             <div key="edit" className="panel-in">
               <div className="flex items-center gap-2 mb-1">
                 <button onClick={cancelEdit} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0">
@@ -617,11 +730,10 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Nest under <span className="text-gray-400 font-normal">optional</span></label>
-                <select value={parentId} onChange={e => setParentId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                  <option value="none">No parent label</option>
-                  {allFlat.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
+                <CustomSelect
+                  value={parentId} onChange={setParentId}
+                  options={[{ value: 'none', label: 'No parent label' }, ...allFlat.map(l => ({ value: l.id, label: l.name, color: l.color }))]}
+                />
               </div>
               <div className="flex gap-3">
                 <button onClick={handleCreateSingle} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">Create label</button>
@@ -645,18 +757,11 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                     <span className="text-xs text-gray-400">or select existing</span>
                     <div className="flex-1 h-px bg-gray-200" />
                   </div>
-                  <div className="relative flex-1">
-                    <select
-                      value={batchParentId}
-                      onChange={e => setBatchParentId(e.target.value)}
-                      className="w-full h-full appearance-none px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                    >
-                      <option value="none">None (Top-Level Children)</option>
-                      {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                    </select>
-                    <svg viewBox="0 0 16 16" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2}>
-                      <polyline points="4,6 8,10 12,6" />
-                    </svg>
+                  <div className="flex-1">
+                    <CustomSelect
+                      value={batchParentId} onChange={setBatchParentId}
+                      options={[{ value: 'none', label: 'None (top-level)' }, ...labels.map(l => ({ value: l.id, label: l.name, color: l.color }))]}
+                    />
                   </div>
                 </div>
                 <div className="flex flex-col">

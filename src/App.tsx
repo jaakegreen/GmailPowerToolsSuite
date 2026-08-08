@@ -543,8 +543,17 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
       {/* Right panel — click padding area to deselect label */}
       <div className="flex-1 overflow-y-auto p-8" onClick={() => cancelEdit()}>
         <div className="max-w-2xl" onClick={e => e.stopPropagation()}>
-          {editingLabelId ? (
-            <div key="edit" className="panel-fade-in">
+          <div style={{ display: 'grid' }}>
+
+            {/* ── Edit panel ── always rendered, crossfades in/out */}
+            <div
+              className="panel-layer"
+              style={{
+                opacity: editingLabelId ? 1 : 0,
+                transform: editingLabelId ? 'translateY(0)' : 'translateY(6px)',
+                pointerEvents: editingLabelId ? 'auto' : 'none',
+              }}
+            >
               <div className="flex items-center gap-2 mb-1">
                 <button onClick={cancelEdit} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0">
                   <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -554,14 +563,14 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                 <h2 className="text-2xl font-semibold text-gray-900">Edit Label</h2>
               </div>
               <p className="text-sm text-gray-500 mb-6">Update the name, color, or child labels.</p>
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Label name</label>
                   <input
                     type="text" value={editName} onChange={e => setEditName(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') cancelEdit() }}
-                    autoFocus
+                    tabIndex={editingLabelId ? 0 : -1}
                   />
                 </div>
                 <div>
@@ -582,21 +591,30 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                     onChange={e => setEditChildren(e.target.value)}
                     placeholder={"Sub-label A\nSub-label B"}
                     rows={3}
+                    tabIndex={editingLabelId ? 0 : -1}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   />
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={handleSaveEdit} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">
+                  <button onClick={handleSaveEdit} tabIndex={editingLabelId ? 0 : -1} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">
                     Save changes
                   </button>
-                  <button onClick={cancelEdit} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">
+                  <button onClick={cancelEdit} tabIndex={editingLabelId ? 0 : -1} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">
                     Cancel
                   </button>
                 </div>
               </div>
             </div>
-          ) : (
-            <div key="create" className="panel-fade-in">
+
+            {/* ── Create panel ── always rendered, crossfades in/out */}
+            <div
+              className="panel-layer"
+              style={{
+                opacity: editingLabelId ? 0 : 1,
+                transform: editingLabelId ? 'translateY(-6px)' : 'translateY(0)',
+                pointerEvents: editingLabelId ? 'none' : 'auto',
+              }}
+            >
               <h2 className="text-2xl font-semibold text-gray-900 mb-1">Create & Batch Labels</h2>
               <p className="text-sm text-gray-500 mb-6">Organize your inbox quickly with single or hierarchical batch labels.</p>
               <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit mb-8">
@@ -604,6 +622,7 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                   <button
                     key={m}
                     onClick={() => setMode(m)}
+                    tabIndex={editingLabelId ? -1 : 0}
                     className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                       mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
                     }`}
@@ -617,7 +636,7 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                 ))}
               </div>
               {mode === 'single' ? (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Label name</label>
                 <input
@@ -625,6 +644,7 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                   value={labelName}
                   onChange={e => setLabelName(e.target.value)}
                   placeholder="e.g. Newsletters"
+                  tabIndex={editingLabelId ? -1 : 0}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   onKeyDown={e => e.key === 'Enter' && handleCreateSingle()}
                 />
@@ -633,7 +653,7 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Label color</label>
                 <ColorPicker selected={selectedColor.bg} onSelect={setSelectedColor} />
                 {labelName && (
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-3">
                     <LabelChip label={{ id: 'preview', name: labelName, color: selectedColor.bg, textColor: selectedColor.text, count: 0 }} />
                   </div>
                 )}
@@ -643,6 +663,7 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                 <select
                   value={parentId}
                   onChange={e => setParentId(e.target.value)}
+                  tabIndex={editingLabelId ? -1 : 0}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   <option value="none">No parent label</option>
@@ -652,10 +673,10 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                 </select>
               </div>
               <div className="flex gap-3">
-                <button onClick={handleCreateSingle} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">
+                <button onClick={handleCreateSingle} tabIndex={editingLabelId ? -1 : 0} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">
                   Create label
                 </button>
-                <button onClick={() => { handleCreateSingle(); setLabelName('') }} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">
+                <button onClick={() => { handleCreateSingle(); setLabelName('') }} tabIndex={editingLabelId ? -1 : 0} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">
                   + Add another
                 </button>
               </div>
@@ -714,8 +735,9 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
               </button>
             </div>
           )}
-          </div>
-          )}
+            </div>{/* end create panel layer */}
+
+          </div>{/* end grid wrapper */}
         </div>
       </div>
     </div>

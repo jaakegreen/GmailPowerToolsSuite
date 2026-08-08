@@ -50,13 +50,6 @@ html, body, #root {
   animation: swatch-select 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes panel-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.panel-fade-in {
-  animation: panel-fade-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
 
 @keyframes drop-line-in {
   from { opacity: 0; scaleX: 0.8; }

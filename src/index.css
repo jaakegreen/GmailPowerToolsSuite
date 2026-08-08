@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Inter', system-ui, sans-serif;
   --color-background: #f6f8fa;
@@ -16,6 +18,14 @@
   box-sizing: border-box;
 }
 
+*:not(svg, svg *, [class*="animate-"], [class*="transition-"]) {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.15s ease;
+}
+
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -23,6 +33,11 @@ html, body, #root {
   background: #f6f8fa;
   color: #1f2328;
   -webkit-font-smoothing: antialiased;
+}
+
+html.dark, html.dark body, html.dark #root {
+  background: #0d1117;
+  color: #e6edf3;
 }
 
 ::-webkit-scrollbar {
@@ -38,6 +53,13 @@ html, body, #root {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #aab0ba;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #30363d;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
 }
 
 @keyframes swatch-select {
@@ -89,6 +111,15 @@ html, body, #root {
   color: #ffffff;
 }
 
+html.dark .btn-primary {
+  background-color: #58a6ff;
+  color: #0d1117;
+}
+html.dark .btn-primary:hover {
+  background-color: #79b8ff;
+  color: #0d1117;
+}
+
 .btn-batch {
   background-color: rgb(71, 113, 217);
   color: #ffffff;
@@ -96,6 +127,15 @@ html, body, #root {
 }
 .btn-batch:hover {
   background-color: rgb(57, 96, 196);
+}
+
+html.dark .btn-batch {
+  background-color: #58a6ff;
+  color: #0d1117;
+}
+html.dark .btn-batch:hover {
+  background-color: #79b8ff;
+  color: #0d1117;
 }
 
 .btn-secondary {
@@ -107,4 +147,26 @@ html, body, #root {
 .btn-secondary:hover {
   background-color: #f3f4f6;
   border-color: #9ca3af;
+}
+
+html.dark .btn-secondary {
+  border-color: #30363d;
+  color: #adbac7;
+}
+html.dark .btn-secondary:hover {
+  background-color: #21262d;
+  border-color: #484f58;
+}
+
+/* Dark mode input color-scheme */
+html.dark input,
+html.dark textarea,
+html.dark select {
+  color-scheme: dark;
+}
+
+/* Selected radio/checkbox in dark */
+html.dark input[type="radio"],
+html.dark input[type="checkbox"] {
+  accent-color: #4493f8;
 }

@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 
 type View = 'labels' | 'inbox' | 'visualize'
 type LabelMode = 'single' | 'batch'
+type ThemePreference = 'system' | 'light' | 'dark'
 
 interface Label {
   id: string
@@ -23,6 +24,161 @@ interface Email {
   labelId?: string
   date: string
   unread: boolean
+}
+
+// ─── useTheme hook ────────────────────────────────────────────────────────────
+
+function useTheme(): [ThemePreference, (t: ThemePreference) => void] {
+  const [theme, setThemeState] = useState<ThemePreference>(() => {
+    const stored = localStorage.getItem('gpt-theme')
+    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
+    return 'system'
+  })
+
+  useEffect(() => {
+    function applyTheme(pref: ThemePreference) {
+      const root = document.documentElement
+      if (pref === 'dark') {
+        root.classList.add('dark')
+      } else if (pref === 'light') {
+        root.classList.remove('dark')
+      } else {
+        // system
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          root.classList.add('dark')
+        } else {
+          root.classList.remove('dark')
+        }
+      }
+    }
+
+    applyTheme(theme)
+
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const handler = () => applyTheme('system')
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    }
+  }, [theme])
+
+  const setTheme = (t: ThemePreference) => {
+    localStorage.setItem('gpt-theme', t)
+    setThemeState(t)
+  }
+
+  return [theme, setTheme]
+}
+
+// ─── SettingsPopover ──────────────────────────────────────────────────────────
+
+function SettingsPopover({ theme, onThemeChange }: { theme: ThemePreference; onThemeChange: (t: ThemePreference) => void }) {
+  const [open, setOpen] = useState(false)
+  const [view, setView] = useState<'main' | 'appearance'>('main')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); setView('main') } }
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setView('main') } }
+    document.addEventListener('keydown', handleKey)
+    document.addEventListener('mousedown', handleClick)
+    return () => { document.removeEventListener('keydown', handleKey); document.removeEventListener('mousedown', handleClick) }
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => { setOpen(o => !o); setView('main') }}
+        className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#8b949e] hover:bg-gray-100 dark:hover:bg-[#21262d] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+        aria-label="Settings"
+      >
+        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1.5 z-50 bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl shadow-lg overflow-hidden"
+          style={{ width: 256, boxShadow: '0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)' }}
+        >
+          {view === 'main' ? (
+            <>
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-[#30363d]">
+                <span className="text-sm font-semibold text-gray-900 dark:text-[#e6edf3]">Settings</span>
+              </div>
+              <button
+                onClick={() => setView('appearance')}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 dark:text-[#adbac7] hover:bg-gray-50 dark:hover:bg-[#21262d] transition-colors border-b border-gray-100 dark:border-[#30363d]"
+              >
+                <span>Appearance</span>
+                <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 text-gray-400 dark:text-[#6e7681]" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <polyline points="6,3 11,8 6,13" />
+                </svg>
+              </button>
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-[#30363d]">
+                <span className="text-xs font-semibold text-gray-400 dark:text-[#6e7681] uppercase tracking-wider">Gmail</span>
+              </div>
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 dark:text-[#adbac7]">Connected</span>
+                </div>
+                <button className="flex items-center justify-between w-full text-sm text-gray-500 dark:text-[#8b949e] hover:text-gray-800 dark:hover:text-[#e6edf3] transition-colors">
+                  <span>Manage connection</span>
+                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <polyline points="6,3 11,8 6,13" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-[#30363d]">
+                <button
+                  onClick={() => setView('main')}
+                  className="w-6 h-6 flex items-center justify-center rounded text-gray-400 dark:text-[#6e7681] hover:text-gray-700 dark:hover:text-[#e6edf3] hover:bg-gray-100 dark:hover:bg-[#21262d] transition-colors"
+                >
+                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <polyline points="10,3 5,8 10,13" />
+                  </svg>
+                </button>
+                <span className="text-sm font-semibold text-gray-900 dark:text-[#e6edf3]">Appearance</span>
+              </div>
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-[#30363d]">
+                <p className="text-xs font-semibold text-gray-400 dark:text-[#6e7681] uppercase tracking-wider mb-3">Theme</p>
+                <div className="space-y-2">
+                  {(['system', 'light', 'dark'] as ThemePreference[]).map(t => (
+                    <label key={t} className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="radio"
+                        name="theme"
+                        value={t}
+                        checked={theme === t}
+                        onChange={() => onThemeChange(t)}
+                        className="w-4 h-4 accent-blue-500 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-[#adbac7] group-hover:text-gray-900 dark:group-hover:text-[#e6edf3] capitalize transition-colors">
+                        {t}
+                        {t === 'system' && <span className="ml-1 text-gray-400 dark:text-[#6e7681] text-xs font-normal">(default)</span>}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-xs text-gray-400 dark:text-[#6e7681] leading-relaxed">
+                  System follows your device appearance setting.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Gmail Color Palette (exact Gmail label color picker values) ──────────────
@@ -226,31 +382,31 @@ function CustomSelect({ value, onChange, options, placeholder }: {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors hover:border-gray-400"
+        className="w-full flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-[#30363d] rounded-lg text-sm bg-white dark:bg-[#161b22] text-left focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors hover:border-gray-400 dark:hover:border-[#484f58]"
       >
         {selected?.color && <LabelDot color={selected.color} size={8} />}
-        <span className={`flex-1 truncate ${selected ? 'text-gray-800' : 'text-gray-400'}`}>
+        <span className={`flex-1 truncate ${selected ? 'text-gray-800 dark:text-[#cdd9e5]' : 'text-gray-400 dark:text-[#6e7681]'}`}>
           {selected?.label ?? placeholder ?? 'Select…'}
         </span>
-        <svg viewBox="0 0 16 16" className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2}>
+        <svg viewBox="0 0 16 16" className={`w-3.5 h-3.5 text-gray-400 dark:text-[#6e7681] flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2}>
           <polyline points="3,6 8,10 13,6" />
         </svg>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1.5 w-full bg-white rounded-xl py-1 overflow-y-auto max-h-48"
-          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.06)' }}>
+        <div className="absolute z-50 mt-1.5 w-full bg-white dark:bg-[#1c2128] rounded-xl py-1 overflow-y-auto max-h-48 border border-gray-100 dark:border-[#30363d]"
+          style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)' }}>
           {options.map(o => (
             <button
               key={o.value} type="button"
               onClick={() => { onChange(o.value); setOpen(false) }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
-                o.value === value ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                o.value === value ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-[#58a6ff]' : 'text-gray-700 dark:text-[#adbac7] hover:bg-gray-50 dark:hover:bg-[#21262d]'
               }`}
             >
               {o.color && <LabelDot color={o.color} size={8} />}
               <span className="flex-1 truncate">{o.label}</span>
               {o.value === value && (
-                <svg viewBox="0 0 12 12" className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                <svg viewBox="0 0 12 12" className="w-3 h-3 text-blue-500 dark:text-[#58a6ff] flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <polyline points="2,6 5,9 10,3" />
                 </svg>
               )}
@@ -356,13 +512,13 @@ function LabelTreeItem({
         }}
         className={`flex items-center gap-1.5 py-1.5 rounded-md select-none group/row transition-colors cursor-pointer ${
           isDragging ? 'opacity-30' : ''
-        } ${isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : isEditing ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : isOver && dragOver?.pos === 'inside' ? 'bg-blue-50 ring-1 ring-inset ring-blue-300' : 'hover:bg-gray-50'}`}
+        } ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-inset ring-blue-200 dark:ring-blue-700' : isEditing ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-inset ring-blue-200 dark:ring-blue-700' : isOver && dragOver?.pos === 'inside' ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-inset ring-blue-300 dark:ring-blue-600' : 'hover:bg-gray-50 dark:hover:bg-[#21262d]'}`}
         style={{ paddingLeft: depth === 0 ? 8 : 20, paddingRight: 12 }}
       >
         {hasChildren ? (
           <button
             onClick={e => { e.stopPropagation(); onToggle(label.id) }}
-            className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-700 flex-shrink-0 transition-colors"
+            className="w-4 h-4 flex items-center justify-center text-gray-400 dark:text-[#6e7681] hover:text-gray-700 dark:hover:text-[#adbac7] flex-shrink-0 transition-colors"
           >
             <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2}>
               {label.expanded ? <polyline points="3,6 8,11 13,6" /> : <polyline points="6,3 11,8 6,13" />}
@@ -373,10 +529,10 @@ function LabelTreeItem({
         )}
 
         <LabelDot color={label.color} />
-        <span className={`flex-1 text-sm ${depth === 0 ? 'font-medium text-gray-800' : 'text-gray-700'}`}>
+        <span className={`flex-1 text-sm ${depth === 0 ? 'font-medium text-gray-800 dark:text-[#cdd9e5]' : 'text-gray-700 dark:text-[#adbac7]'}`}>
           {label.name}
         </span>
-        <span className="text-xs text-gray-400 tabular-nums">{label.count}</span>
+        <span className="text-xs text-gray-400 dark:text-[#6e7681] tabular-nums">{label.count}</span>
       </div>
       {isOver && dragOver?.pos === 'after' && <DropLine depth={depth} />}
 
@@ -431,8 +587,7 @@ function ColorPicker({ selected, onSelect }: { selected: string; onSelect: (colo
         </div>
         <button
           title="Custom color"
-          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ border: '1.5px dashed #bbb', background: 'transparent', color: '#aaa' }}
+          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-transparent border border-dashed border-[#bbb] dark:border-[#484f58] text-[#aaa] dark:text-[#6e7681]"
         >
           <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2}>
             <line x1="6" y1="1" x2="6" y2="11" />
@@ -609,10 +764,10 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
   return (
     <div className="flex flex-1 gap-0 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-72 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden" onClick={() => cancelEdit()}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Your Labels</span>
-          <span className="text-xs text-gray-400">drag to rearrange</span>
+      <div className="w-72 flex-shrink-0 bg-white dark:bg-[#161b22] border-r border-gray-200 dark:border-[#30363d] flex flex-col overflow-hidden" onClick={() => cancelEdit()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#30363d]">
+          <span className="text-xs font-semibold text-gray-500 dark:text-[#8b949e] uppercase tracking-wider">Your Labels</span>
+          <span className="text-xs text-gray-400 dark:text-[#6e7681]">drag to rearrange</span>
         </div>
         <div
           className="flex-1 overflow-y-auto py-2 px-2"
@@ -629,8 +784,8 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
           ))}
         </div>
 
-        <div className="px-4 py-3 border-t border-gray-100">
-          <div className="text-xs text-gray-400">{selectedIds.size > 0 ? `${selectedIds.size} selected — shift+click to add` : `${totalLabels} labels total`}</div>
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-[#30363d]">
+          <div className="text-xs text-gray-400 dark:text-[#6e7681]">{selectedIds.size > 0 ? `${selectedIds.size} selected — shift+click to add` : `${totalLabels} labels total`}</div>
         </div>
       </div>
 
@@ -639,11 +794,11 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
         <div className="max-w-2xl" onClick={e => e.stopPropagation()}>
           {selectedIds.size > 0 ? (
             <div key="batch" className="panel-in">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-1">Change Color</h2>
-              <p className="text-sm text-gray-500 mb-6">{selectedIds.size} label{selectedIds.size > 1 ? 's' : ''} selected — shift+click to add or remove.</p>
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-[#e6edf3] mb-1">Change Color</h2>
+              <p className="text-sm text-gray-500 dark:text-[#8b949e] mb-6">{selectedIds.size} label{selectedIds.size > 1 ? 's' : ''} selected — shift+click to add or remove.</p>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Pick a color</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-2">Pick a color</label>
                   <ColorPicker selected={batchSelColor.bg} onSelect={setBatchSelColor} />
                 </div>
                 <div className="flex gap-3">
@@ -659,36 +814,36 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
           ) : editingLabelId ? (
             <div key="edit" className="panel-in">
               <div className="flex items-center gap-2 mb-1">
-                <button onClick={cancelEdit} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0">
+                <button onClick={cancelEdit} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 dark:text-[#6e7681] hover:text-gray-700 dark:hover:text-[#adbac7] hover:bg-gray-100 dark:hover:bg-[#21262d] transition-colors flex-shrink-0">
                   <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
                     <polyline points="10,3 5,8 10,13" />
                   </svg>
                 </button>
-                <h2 className="text-2xl font-semibold text-gray-900">Edit Label</h2>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-[#e6edf3]">Edit Label</h2>
               </div>
-              <p className="text-sm text-gray-500 mb-6">Update the name, color, or child labels.</p>
+              <p className="text-sm text-gray-500 dark:text-[#8b949e] mb-6">Update the name, color, or child labels.</p>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Label name</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-1.5">Label name</label>
                   <input
                     autoFocus type="text" value={editName} onChange={e => setEditName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363d] rounded-lg text-sm bg-white dark:bg-[#161b22] text-gray-900 dark:text-[#e6edf3] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') cancelEdit() }}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Label color</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-1.5">Label color</label>
                   <ColorPicker selected={editColor.bg} onSelect={setEditColor} />
                   {editName && <div className="mt-3"><LabelChip label={{ id: 'p', name: editName, color: editColor.bg, textColor: editColor.text, count: 0 }} /></div>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Add child labels <span className="text-gray-400 font-normal">optional · one per line</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-1.5">
+                    Add child labels <span className="text-gray-400 dark:text-[#6e7681] font-normal">optional · one per line</span>
                   </label>
                   <textarea
                     value={editChildren} onChange={e => setEditChildren(e.target.value)}
                     placeholder={"Sub-label A\nSub-label B"} rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363d] rounded-lg text-sm bg-white dark:bg-[#161b22] text-gray-900 dark:text-[#e6edf3] focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   />
                 </div>
                 <div className="flex gap-3">
@@ -699,12 +854,12 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
             </div>
           ) : (
             <div key="create" className="panel-in">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-1">Create & Batch Labels</h2>
-              <p className="text-sm text-gray-500 mb-6">Organize your inbox quickly with single or hierarchical batch labels.</p>
-              <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-[#e6edf3] mb-1">Create &amp; Batch Labels</h2>
+              <p className="text-sm text-gray-500 dark:text-[#8b949e] mb-6">Organize your inbox quickly with single or hierarchical batch labels.</p>
+              <div className="flex gap-1 p-1 bg-gray-100 dark:bg-[#21262d] rounded-lg w-fit mb-8">
                 {(['single', 'batch'] as LabelMode[]).map(m => (
                   <button key={m} onClick={() => setMode(m)}
-                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${mode === m ? 'bg-white dark:bg-[#161b22] shadow-sm text-gray-900 dark:text-[#e6edf3]' : 'text-gray-500 dark:text-[#8b949e] hover:text-gray-700 dark:hover:text-[#adbac7]'}`}
                   >
                     {m === 'single' ? (
                       <><svg viewBox="0 0 12 12" className="w-3.5 h-3.5" fill="currentColor"><path d="M1 6.5 6.5 1H11v4.5L5.5 11 1 6.5ZM8.5 4a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z" /></svg> Single Label</>
@@ -717,19 +872,19 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
               {mode === 'single' ? (
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Label name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-1.5">Label name</label>
                 <input type="text" value={labelName} onChange={e => setLabelName(e.target.value)}
                   placeholder="e.g. Newsletters"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363d] rounded-lg text-sm bg-white dark:bg-[#161b22] text-gray-900 dark:text-[#e6edf3] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   onKeyDown={e => e.key === 'Enter' && handleCreateSingle()} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Label color</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-1.5">Label color</label>
                 <ColorPicker selected={selectedColor.bg} onSelect={setSelectedColor} />
                 {labelName && <div className="mt-3"><LabelChip label={{ id: 'p', name: labelName, color: selectedColor.bg, textColor: selectedColor.text, count: 0 }} /></div>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nest under <span className="text-gray-400 font-normal">optional</span></label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-1.5">Nest under <span className="text-gray-400 dark:text-[#6e7681] font-normal">optional</span></label>
                 <CustomSelect
                   value={parentId} onChange={setParentId}
                   options={[{ value: 'none', label: 'No parent label' }, ...allFlat.map(l => ({ value: l.id, label: l.name, color: l.color }))]}
@@ -744,18 +899,18 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 items-stretch">
                 <div className="flex flex-col">
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">1. Parent Label Name</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-1.5">1. Parent Label Name</label>
                   <input
                     type="text"
                     value={batchParent}
                     onChange={e => setBatchParent(e.target.value)}
                     placeholder="New Parent (e.g. Projects)"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363d] rounded-lg text-sm bg-white dark:bg-[#161b22] text-gray-900 dark:text-[#e6edf3] focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <div className="my-3 flex items-center gap-2">
-                    <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-xs text-gray-400">or select existing</span>
-                    <div className="flex-1 h-px bg-gray-200" />
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-[#30363d]" />
+                    <span className="text-xs text-gray-400 dark:text-[#6e7681]">or select existing</span>
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-[#30363d]" />
                   </div>
                   <div className="flex-1">
                     <CustomSelect
@@ -765,17 +920,17 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <label className="block text-sm font-medium text-gray-700 mb-0.5">2. Sub-Labels <span className="text-gray-400 font-normal">(1 per line)</span></label>
-                  <p className="text-xs text-gray-400 mb-1.5">Each line will be created as a sub-label under the parent.</p>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-0.5">2. Sub-Labels <span className="text-gray-400 dark:text-[#6e7681] font-normal">(1 per line)</span></label>
+                  <p className="text-xs text-gray-400 dark:text-[#6e7681] mb-1.5">Each line will be created as a sub-label under the parent.</p>
                   <textarea
                     value={batchChildren}
                     onChange={e => setBatchChildren(e.target.value)}
-                    className="w-full flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full flex-1 px-3 py-2 border border-gray-300 dark:border-[#30363d] rounded-lg text-sm bg-white dark:bg-[#161b22] text-gray-900 dark:text-[#e6edf3] focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">3. Color Preset for Batch</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#adbac7] mb-2">3. Color Preset for Batch</label>
                 <ColorPicker selected={batchColor.bg} onSelect={setBatchColor} />
               </div>
               <button
@@ -925,15 +1080,15 @@ function EmailContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-50 bg-white rounded-2xl overflow-hidden"
-      style={{ left, top, width: 300, boxShadow: '0 12px 40px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.07)' }}
+      className="fixed z-50 bg-white dark:bg-[#1c2128] rounded-2xl overflow-hidden border border-black/[0.07] dark:border-[#30363d]"
+      style={{ left, top, width: 300, boxShadow: '0 12px 40px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08)' }}
       onClick={e => e.stopPropagation()}
     >
       {/* Assigned labels — draggable chips with hover-X */}
       {assignedLabels.length > 0 && (
-        <div className="px-4 pt-4 pb-3 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Assigned labels <span className="font-normal normal-case text-gray-300">· drag to reorder</span>
+        <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#30363d]">
+          <p className="text-xs font-semibold text-gray-400 dark:text-[#6e7681] uppercase tracking-wider mb-2">
+            Assigned labels <span className="font-normal normal-case text-gray-300 dark:text-[#484f58]">· drag to reorder</span>
           </p>
           <div className="flex flex-wrap gap-1.5">
             {assignedLabels.map(l => (
@@ -955,8 +1110,8 @@ function EmailContextMenu({
 
       {/* Suggestions */}
       {suggestions.length > 0 && (
-        <div className="px-4 pt-3 pb-3 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Suggested</p>
+        <div className="px-4 pt-3 pb-3 border-b border-gray-100 dark:border-[#30363d]">
+          <p className="text-xs font-semibold text-gray-400 dark:text-[#6e7681] uppercase tracking-wider mb-2">Suggested</p>
           <div className="flex flex-wrap gap-1.5">
             {suggestions.map(l => (
               <button key={l.id} onClick={e => { onToggleLabel(emailId, l.id); if (!e.shiftKey) onClose() }}
@@ -974,14 +1129,14 @@ function EmailContextMenu({
 
       {/* Search + hierarchical label list */}
       <div className="px-4 pt-3 pb-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Add label</p>
+        <p className="text-xs font-semibold text-gray-400 dark:text-[#6e7681] uppercase tracking-wider mb-2">Add label</p>
         <div className="relative mb-2">
-          <svg viewBox="0 0 16 16" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg viewBox="0 0 16 16" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-[#6e7681] pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2}>
             <circle cx="6.5" cy="6.5" r="4" /><line x1="10" y1="10" x2="14" y2="14" />
           </svg>
           <input autoFocus type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search labels…"
-            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 dark:border-[#30363d] rounded-lg bg-white dark:bg-[#161b22] text-gray-900 dark:text-[#e6edf3] focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div className="max-h-48 overflow-y-auto -mx-1">
           {filtered.map(({ label: l, depth }) => {
@@ -998,15 +1153,15 @@ function EmailContextMenu({
                 onDragEnd={() => { setRowDragId(null); setRowDragOver(null) }}
                 onClick={e => { onToggleLabel(emailId, l.id); if (!e.shiftKey) onClose() }}
                 className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer select-none
-                  ${assigned ? 'bg-blue-50' : isRowOver ? 'bg-gray-100' : 'hover:bg-gray-50'}
+                  ${assigned ? 'bg-blue-50 dark:bg-blue-900/20' : isRowOver ? 'bg-gray-100 dark:bg-[#21262d]' : 'hover:bg-gray-50 dark:hover:bg-[#21262d]'}
                   ${isRowDragging ? 'opacity-40' : ''}`}
                 style={{ paddingLeft: depth === 1 ? 20 : 8 }}
               >
-                {depth === 1 && <span className="w-3 text-gray-300 text-xs flex-shrink-0">↳</span>}
+                {depth === 1 && <span className="w-3 text-gray-300 dark:text-[#484f58] text-xs flex-shrink-0">↳</span>}
                 <LabelDot color={l.color} />
-                <span className={`flex-1 ${depth === 0 ? 'font-medium text-gray-800' : 'text-gray-600'}`}>{l.name}</span>
+                <span className={`flex-1 ${depth === 0 ? 'font-medium text-gray-800 dark:text-[#cdd9e5]' : 'text-gray-600 dark:text-[#8b949e]'}`}>{l.name}</span>
                 {assigned && (
-                  <svg viewBox="0 0 12 12" className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <svg viewBox="0 0 12 12" className="w-3 h-3 text-blue-500 dark:text-[#58a6ff] flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5}>
                     <polyline points="2,6 5,9 10,3" />
                   </svg>
                 )}
@@ -1045,9 +1200,9 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
   const ctxEmailId = ctxMenu?.emailId ?? null
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col bg-white" onClick={() => setCtxMenu(null)}>
+    <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-[#161b22]" onClick={() => setCtxMenu(null)}>
       {/* Sub-tabs */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-[#30363d] bg-gray-50 dark:bg-[#0d1117]">
         <div className="flex gap-1">
           {[
             { key: 'all', label: 'All mail' },
@@ -1057,20 +1212,20 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
               key={t.key}
               onClick={() => { setTab(t.key as 'all' | 'untagged'); setPage(1) }}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                tab === t.key ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'
+                tab === t.key ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-[#8b949e] hover:bg-gray-200 dark:hover:bg-[#21262d]'
               }`}
             >
               {t.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-400">
+        <div className="flex items-center gap-3 text-sm text-gray-400 dark:text-[#6e7681]">
           <span className="tabular-nums">{(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, displayed.length)} of {displayed.length}</span>
           <div className="flex gap-1">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-[#21262d] disabled:opacity-30 transition-colors">
               <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="10,3 5,8 10,13" /></svg>
             </button>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors">
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-[#21262d] disabled:opacity-30 transition-colors">
               <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6,3 11,8 6,13" /></svg>
             </button>
           </div>
@@ -1078,7 +1233,7 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
       </div>
 
       {/* Column headers */}
-      <div className="grid text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-2 border-b border-gray-100"
+      <div className="grid text-xs font-semibold text-gray-400 dark:text-[#6e7681] uppercase tracking-wider px-4 py-2 border-b border-gray-100 dark:border-[#30363d]"
         style={{ gridTemplateColumns: '160px 1fr 160px 64px' }}>
         <span>From</span>
         <span>Subject</span>
@@ -1087,7 +1242,7 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
       </div>
 
       {/* Email rows */}
-      <div className="flex-1 overflow-y-scroll divide-y divide-gray-100">
+      <div className="flex-1 overflow-y-scroll divide-y divide-gray-100 dark:divide-[#30363d]">
         {pageEmails.map(email => {
           const labelIds = emailLabels[email.id] ?? []
           const assignedLabels = labelIds.map(id => getLabelById(labels, id)).filter(Boolean) as Label[]
@@ -1097,28 +1252,28 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
               key={email.id}
               onContextMenu={e => handleContextMenu(e, email.id)}
               onClick={e => { e.stopPropagation(); setExpandedId(expanded ? null : email.id); setCtxMenu(null) }}
-              className={`px-4 cursor-default select-none ${expanded ? 'bg-blue-50/40' : 'hover:bg-gray-50'}`}
+              className={`px-4 cursor-default select-none ${expanded ? 'bg-blue-50/40 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-[#21262d]'}`}
               style={{ transition: 'background-color 0.2s ease' }}
             >
               <div className="grid items-center py-2.5" style={{ gridTemplateColumns: '160px 1fr 160px 64px' }}>
                 <div className="flex items-center gap-2 min-w-0">
                   {email.unread && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />}
-                  <span className={`truncate text-sm ${email.unread ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                  <span className={`truncate text-sm ${email.unread ? 'font-semibold text-gray-900 dark:text-[#e6edf3]' : 'text-gray-700 dark:text-[#adbac7]'}`}>
                     {email.from}
                   </span>
                 </div>
                 <div className="truncate text-sm min-w-0 pr-4">
-                  <span className={email.unread ? 'font-semibold text-gray-900' : 'text-gray-800'}>{email.subject}</span>
-                  {!expanded && <span className="text-gray-400 font-normal"> — {email.preview}</span>}
+                  <span className={email.unread ? 'font-semibold text-gray-900 dark:text-[#e6edf3]' : 'text-gray-800 dark:text-[#cdd9e5]'}>{email.subject}</span>
+                  {!expanded && <span className="text-gray-400 dark:text-[#6e7681] font-normal"> — {email.preview}</span>}
                 </div>
                 <div className="flex gap-1 flex-wrap px-3">
                   {assignedLabels.map(l => <LabelChip key={l.id} label={l} />)}
                 </div>
-                <div className="text-xs text-gray-400 text-right tabular-nums">{email.date}</div>
+                <div className="text-xs text-gray-400 dark:text-[#6e7681] text-right tabular-nums">{email.date}</div>
               </div>
               <div className={`email-expand${expanded ? ' open' : ''}`}>
                 <div>
-                  <div className="pb-3 pl-4 text-sm text-gray-600 leading-relaxed border-t border-blue-100 pt-2">
+                  <div className="pb-3 pl-4 text-sm text-gray-600 dark:text-[#8b949e] leading-relaxed border-t border-blue-100 dark:border-blue-900/30 pt-2">
                     {email.preview}
                   </div>
                 </div>
@@ -1173,6 +1328,15 @@ function VisualizationView() {
   const [hoveredInner, setHoveredInner] = useState<string | null>(null)
   const [hoveredOuter, setHoveredOuter] = useState<{ segId: string; senderName: string } | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'))
+    })
+    observer.observe(document.documentElement, { attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   const cx = 260, cy = 260
   const r0 = 70  // center hole
@@ -1196,12 +1360,12 @@ function VisualizationView() {
   const activeOuter = hoveredOuter
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50 p-8">
+    <div className="flex-1 overflow-auto bg-gray-50 dark:bg-[#0d1117] p-8">
       <div className="max-w-5xl mx-auto">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-1">Email Space</h2>
-        <p className="text-sm text-gray-500 mb-8">Visual breakdown of your inbox by label and sender — inspired by DaisyDisk.</p>
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-[#e6edf3] mb-1">Email Space</h2>
+        <p className="text-sm text-gray-500 dark:text-[#8b949e] mb-8">Visual breakdown of your inbox by label and sender — inspired by DaisyDisk.</p>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col lg:flex-row gap-8">
+        <div className="bg-white dark:bg-[#161b22] rounded-2xl border border-gray-200 dark:border-[#30363d] p-6 flex flex-col lg:flex-row gap-8">
           {/* SVG Sunburst */}
           <div className="flex-shrink-0 relative">
             <svg width={520} height={520} style={{ overflow: 'visible' }}>
@@ -1280,18 +1444,18 @@ function VisualizationView() {
               })}
 
               {/* Center hole info */}
-              <circle cx={cx} cy={cy} r={r0 - 2} fill="white" />
+              <circle cx={cx} cy={cy} r={r0 - 2} fill={isDark ? '#161b22' : 'white'} />
               {activeSeg ? (
                 <>
                   <circle cx={cx} cy={cy} r={r0 - 2} fill={activeSeg.color} fillOpacity={0.08} />
                   <text x={cx} y={cy - 14} textAnchor="middle" fontSize={26} fontWeight={700} fontFamily="Inter, sans-serif" fill={activeSeg.color}>{activeSeg.value}</text>
-                  <text x={cx} y={cy + 10} textAnchor="middle" fontSize={11} fontFamily="Inter, sans-serif" fill="#6B7280">emails</text>
-                  <text x={cx} y={cy + 27} textAnchor="middle" fontSize={11} fontWeight={500} fontFamily="Inter, sans-serif" fill="#374151">{activeSeg.name}</text>
+                  <text x={cx} y={cy + 10} textAnchor="middle" fontSize={11} fontFamily="Inter, sans-serif" fill={isDark ? '#8b949e' : '#6B7280'}>emails</text>
+                  <text x={cx} y={cy + 27} textAnchor="middle" fontSize={11} fontWeight={500} fontFamily="Inter, sans-serif" fill={isDark ? '#e6edf3' : '#374151'}>{activeSeg.name}</text>
                 </>
               ) : (
                 <>
-                  <text x={cx} y={cy - 10} textAnchor="middle" fontSize={30} fontWeight={700} fontFamily="Inter, sans-serif" fill="#1f2328">{total}</text>
-                  <text x={cx} y={cy + 14} textAnchor="middle" fontSize={12} fontFamily="Inter, sans-serif" fill="#6B7280">total emails</text>
+                  <text x={cx} y={cy - 10} textAnchor="middle" fontSize={30} fontWeight={700} fontFamily="Inter, sans-serif" fill={isDark ? '#e6edf3' : '#1f2328'}>{total}</text>
+                  <text x={cx} y={cy + 14} textAnchor="middle" fontSize={12} fontFamily="Inter, sans-serif" fill={isDark ? '#8b949e' : '#6B7280'}>total emails</text>
                 </>
               )}
             </svg>
@@ -1303,12 +1467,12 @@ function VisualizationView() {
                   key={d.id}
                   onClick={() => setSelected(selected === d.id ? null : d.id)}
                   className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border transition-all ${
-                    selected === d.id ? 'border-gray-400 bg-gray-50' : 'border-transparent hover:border-gray-200'
-                  }`}
+                    selected === d.id ? 'border-gray-400 dark:border-[#484f58] bg-gray-50 dark:bg-[#21262d]' : 'border-transparent hover:border-gray-200 dark:hover:border-[#30363d]'
+                  } text-gray-700 dark:text-[#adbac7]`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
                   {d.name}
-                  <span className="text-gray-400 font-normal">{d.value}</span>
+                  <span className="text-gray-400 dark:text-[#6e7681] font-normal">{d.value}</span>
                 </button>
               ))}
             </div>
@@ -1320,8 +1484,8 @@ function VisualizationView() {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: activeSeg.color }} />
-                  <h3 className="text-lg font-semibold text-gray-900">{activeSeg.name}</h3>
-                  <span className="text-sm text-gray-400">{((activeSeg.value / total) * 100).toFixed(1)}%</span>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e6edf3]">{activeSeg.name}</h3>
+                  <span className="text-sm text-gray-400 dark:text-[#6e7681]">{((activeSeg.value / total) * 100).toFixed(1)}%</span>
                 </div>
                 <div className="space-y-2">
                   {(activeSeg.senders || []).map(sender => {
@@ -1329,15 +1493,15 @@ function VisualizationView() {
                     const isHov = activeOuter?.senderName === sender.name
                     return (
                       <div key={sender.name}
-                        className={`p-3 rounded-lg border transition-colors ${isHov ? 'border-gray-300 bg-gray-50' : 'border-gray-100'}`}
+                        className={`p-3 rounded-lg border transition-colors ${isHov ? 'border-gray-300 dark:border-[#484f58] bg-gray-50 dark:bg-[#21262d]' : 'border-gray-100 dark:border-[#30363d]'}`}
                         onMouseEnter={() => setHoveredOuter({ segId: activeSeg.id, senderName: sender.name })}
                         onMouseLeave={() => setHoveredOuter(null)}
                       >
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-sm font-medium text-gray-800">{sender.name}</span>
+                          <span className="text-sm font-medium text-gray-800 dark:text-[#cdd9e5]">{sender.name}</span>
                           <span className="text-sm font-semibold tabular-nums" style={{ color: activeSeg.color }}>{sender.count}</span>
                         </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-gray-100 dark:bg-[#21262d] rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all" style={{ width: `${pct * 100}%`, backgroundColor: activeSeg.color }} />
                         </div>
                       </div>
@@ -1347,24 +1511,24 @@ function VisualizationView() {
               </div>
             ) : (
               <div>
-                <h3 className="text-base font-semibold text-gray-700 mb-4">All categories</h3>
+                <h3 className="text-base font-semibold text-gray-700 dark:text-[#adbac7] mb-4">All categories</h3>
                 <div className="space-y-2">
                   {[...SUNBURST_DATA].sort((a, b) => b.value - a.value).map(d => (
                     <button
                       key={d.id}
                       onClick={() => setSelected(d.id)}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-colors text-left"
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-100 dark:border-[#30363d] hover:border-gray-300 dark:hover:border-[#484f58] hover:bg-gray-50 dark:hover:bg-[#21262d] transition-colors text-left"
                     >
                       <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                      <span className="flex-1 text-sm font-medium text-gray-800">{d.name}</span>
-                      <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#cdd9e5]">{d.name}</span>
+                      <div className="w-24 h-1.5 bg-gray-100 dark:bg-[#21262d] rounded-full overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${(d.value / total) * 100}%`, backgroundColor: d.color }} />
                       </div>
-                      <span className="text-sm font-semibold tabular-nums text-gray-600 w-8 text-right">{d.value}</span>
+                      <span className="text-sm font-semibold tabular-nums text-gray-600 dark:text-[#8b949e] w-8 text-right">{d.value}</span>
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-gray-400 mt-4">Click a segment or category to drill down into senders.</p>
+                <p className="text-xs text-gray-400 dark:text-[#6e7681] mt-4">Click a segment or category to drill down into senders.</p>
               </div>
             )}
           </div>
@@ -1379,20 +1543,21 @@ function VisualizationView() {
 export default function App() {
   const [view, setView] = useState<View>('labels')
   const [labels, setLabels] = useState<Label[]>(INITIAL_LABELS)
+  const [theme, setTheme] = useTheme()
 
   const totalLabels = flattenLabels(labels).length
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-[#0d1117] overflow-hidden">
       {/* Top nav */}
-      <header className="flex items-center gap-6 px-5 py-0 bg-white border-b border-gray-200 flex-shrink-0 h-12">
+      <header className="flex items-center gap-6 px-5 py-0 bg-white dark:bg-[#161b22] border-b border-gray-200 dark:border-[#30363d] flex-shrink-0 h-12">
         <div className="flex items-center gap-2.5">
           {/* Gmail envelope icon */}
           <svg viewBox="0 0 22 18" className="w-5 h-5" fill="none">
             <rect x="1" y="1" width="20" height="16" rx="2" stroke="#EA4335" strokeWidth="1.5" fill="none" />
             <polyline points="1,2 11,10 21,2" stroke="#EA4335" strokeWidth="1.5" fill="none" />
           </svg>
-          <span className="text-sm font-bold text-gray-900">Gmail Label Manager</span>
+          <span className="text-sm font-bold text-gray-900 dark:text-[#e6edf3]">Gmail Label Manager</span>
         </div>
 
         <nav className="flex gap-1 ml-2">
@@ -1406,8 +1571,8 @@ export default function App() {
               onClick={() => setView(item.key)}
               className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-colors ${
                 view === item.key
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-[#58a6ff]'
+                  : 'text-gray-500 dark:text-[#8b949e] hover:text-gray-800 dark:hover:text-[#e6edf3] hover:bg-gray-100 dark:hover:bg-[#21262d]'
               }`}
             >
               {item.label}
@@ -1415,6 +1580,9 @@ export default function App() {
           ))}
         </nav>
 
+        <div className="ml-auto">
+          <SettingsPopover theme={theme} onThemeChange={setTheme} />
+        </div>
       </header>
 
       {/* Content */}

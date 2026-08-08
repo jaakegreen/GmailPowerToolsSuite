@@ -543,17 +543,8 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
       {/* Right panel — click padding area to deselect label */}
       <div className="flex-1 overflow-y-auto p-8" onClick={() => cancelEdit()}>
         <div className="max-w-2xl" onClick={e => e.stopPropagation()}>
-          <div style={{ display: 'grid' }}>
-
-            {/* ── Edit panel ── always rendered, crossfades in/out */}
-            <div
-              className="panel-layer"
-              style={{
-                opacity: editingLabelId ? 1 : 0,
-                transform: editingLabelId ? 'translateY(0)' : 'translateY(6px)',
-                pointerEvents: editingLabelId ? 'auto' : 'none',
-              }}
-            >
+          {editingLabelId ? (
+            <div key="edit" className="panel-in">
               <div className="flex items-center gap-2 mb-1">
                 <button onClick={cancelEdit} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0">
                   <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -567,65 +558,40 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Label name</label>
                   <input
-                    type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                    autoFocus type="text" value={editName} onChange={e => setEditName(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') cancelEdit() }}
-                    tabIndex={editingLabelId ? 0 : -1}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Label color</label>
                   <ColorPicker selected={editColor.bg} onSelect={setEditColor} />
-                  {editName && (
-                    <div className="mt-3">
-                      <LabelChip label={{ id: 'preview', name: editName, color: editColor.bg, textColor: editColor.text, count: 0 }} />
-                    </div>
-                  )}
+                  {editName && <div className="mt-3"><LabelChip label={{ id: 'p', name: editName, color: editColor.bg, textColor: editColor.text, count: 0 }} /></div>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Add child labels <span className="text-gray-400 font-normal">optional · one per line</span>
                   </label>
                   <textarea
-                    value={editChildren}
-                    onChange={e => setEditChildren(e.target.value)}
-                    placeholder={"Sub-label A\nSub-label B"}
-                    rows={3}
-                    tabIndex={editingLabelId ? 0 : -1}
+                    value={editChildren} onChange={e => setEditChildren(e.target.value)}
+                    placeholder={"Sub-label A\nSub-label B"} rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   />
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={handleSaveEdit} tabIndex={editingLabelId ? 0 : -1} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">
-                    Save changes
-                  </button>
-                  <button onClick={cancelEdit} tabIndex={editingLabelId ? 0 : -1} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">
-                    Cancel
-                  </button>
+                  <button onClick={handleSaveEdit} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">Save changes</button>
+                  <button onClick={cancelEdit} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">Cancel</button>
                 </div>
               </div>
             </div>
-
-            {/* ── Create panel ── always rendered, crossfades in/out */}
-            <div
-              className="panel-layer"
-              style={{
-                opacity: editingLabelId ? 0 : 1,
-                transform: editingLabelId ? 'translateY(-6px)' : 'translateY(0)',
-                pointerEvents: editingLabelId ? 'none' : 'auto',
-              }}
-            >
+          ) : (
+            <div key="create" className="panel-in">
               <h2 className="text-2xl font-semibold text-gray-900 mb-1">Create & Batch Labels</h2>
               <p className="text-sm text-gray-500 mb-6">Organize your inbox quickly with single or hierarchical batch labels.</p>
               <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit mb-8">
                 {(['single', 'batch'] as LabelMode[]).map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    tabIndex={editingLabelId ? -1 : 0}
-                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                      mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                  <button key={m} onClick={() => setMode(m)}
+                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                   >
                     {m === 'single' ? (
                       <><svg viewBox="0 0 12 12" className="w-3.5 h-3.5" fill="currentColor"><path d="M1 6.5 6.5 1H11v4.5L5.5 11 1 6.5ZM8.5 4a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z" /></svg> Single Label</>
@@ -639,46 +605,27 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Label name</label>
-                <input
-                  type="text"
-                  value={labelName}
-                  onChange={e => setLabelName(e.target.value)}
+                <input type="text" value={labelName} onChange={e => setLabelName(e.target.value)}
                   placeholder="e.g. Newsletters"
-                  tabIndex={editingLabelId ? -1 : 0}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onKeyDown={e => e.key === 'Enter' && handleCreateSingle()}
-                />
+                  onKeyDown={e => e.key === 'Enter' && handleCreateSingle()} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Label color</label>
                 <ColorPicker selected={selectedColor.bg} onSelect={setSelectedColor} />
-                {labelName && (
-                  <div className="mt-3">
-                    <LabelChip label={{ id: 'preview', name: labelName, color: selectedColor.bg, textColor: selectedColor.text, count: 0 }} />
-                  </div>
-                )}
+                {labelName && <div className="mt-3"><LabelChip label={{ id: 'p', name: labelName, color: selectedColor.bg, textColor: selectedColor.text, count: 0 }} /></div>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Nest under <span className="text-gray-400 font-normal">optional</span></label>
-                <select
-                  value={parentId}
-                  onChange={e => setParentId(e.target.value)}
-                  tabIndex={editingLabelId ? -1 : 0}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
+                <select value={parentId} onChange={e => setParentId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                   <option value="none">No parent label</option>
-                  {allFlat.filter(l => !labels.some(root => root.children?.some(c => c.id === l.id) && false)).map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
+                  {allFlat.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
               </div>
               <div className="flex gap-3">
-                <button onClick={handleCreateSingle} tabIndex={editingLabelId ? -1 : 0} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">
-                  Create label
-                </button>
-                <button onClick={() => { handleCreateSingle(); setLabelName('') }} tabIndex={editingLabelId ? -1 : 0} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">
-                  + Add another
-                </button>
+                <button onClick={handleCreateSingle} className="btn-primary px-5 py-2 text-sm font-medium rounded-lg">Create label</button>
+                <button onClick={() => { handleCreateSingle(); setLabelName('') }} className="btn-secondary px-5 py-2 text-sm font-medium rounded-lg">+ Add another</button>
               </div>
             </div>
           ) : (
@@ -728,16 +675,15 @@ function LabelsView({ labels, onLabelsChange }: { labels: Label[]; onLabelsChang
               </div>
               <button
                 onClick={handleBatchCreate}
-                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="btn-batch flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-lg"
               >
                 <svg viewBox="0 0 14 12" className="w-4 h-4" fill="currentColor"><path d="M1 6.5 6.5 1H11v4.5L5.5 11 1 6.5ZM8.5 4a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z" opacity="0.4" transform="translate(2,0)" /><path d="M1 6.5 6.5 1H11v4.5L5.5 11 1 6.5ZM8.5 4a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z" /></svg>
                 Batch Create Parent &amp; Children
               </button>
             </div>
           )}
-            </div>{/* end create panel layer */}
-
-          </div>{/* end grid wrapper */}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1000,7 +946,7 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
         <div className="flex gap-1">
           {[
             { key: 'all', label: 'All mail' },
-            { key: 'untagged', label: `Untagged (${untagged.length})` },
+            { key: 'untagged', label: `Unlabeled (${untagged.length})` },
           ].map(t => (
             <button
               key={t.key}
@@ -1028,15 +974,15 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
 
       {/* Column headers */}
       <div className="grid text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-2 border-b border-gray-100"
-        style={{ gridTemplateColumns: '160px 1fr 140px 64px' }}>
+        style={{ gridTemplateColumns: '160px 1fr 160px 64px' }}>
         <span>From</span>
         <span>Subject</span>
-        <span>Label</span>
+        <span className="pl-3">Label</span>
         <span className="text-right">Date</span>
       </div>
 
       {/* Email rows */}
-      <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+      <div className="flex-1 overflow-y-scroll divide-y divide-gray-100">
         {pageEmails.map(email => {
           const labelIds = emailLabels[email.id] ?? []
           const assignedLabels = labelIds.map(id => getLabelById(labels, id)).filter(Boolean) as Label[]
@@ -1046,9 +992,10 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
               key={email.id}
               onContextMenu={e => handleContextMenu(e, email.id)}
               onClick={e => { e.stopPropagation(); setExpandedId(expanded ? null : email.id); setCtxMenu(null) }}
-              className={`px-4 transition-colors cursor-default select-none ${expanded ? 'bg-blue-50/40' : 'hover:bg-gray-50'}`}
+              className={`px-4 cursor-default select-none ${expanded ? 'bg-blue-50/40' : 'hover:bg-gray-50'}`}
+              style={{ transition: 'background-color 0.2s ease' }}
             >
-              <div className="grid items-center py-2.5" style={{ gridTemplateColumns: '160px 1fr auto 64px' }}>
+              <div className="grid items-center py-2.5" style={{ gridTemplateColumns: '160px 1fr 160px 64px' }}>
                 <div className="flex items-center gap-2 min-w-0">
                   {email.unread && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />}
                   <span className={`truncate text-sm ${email.unread ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
@@ -1059,16 +1006,18 @@ function InboxView({ labels, onReorderLabels }: { labels: Label[]; onReorderLabe
                   <span className={email.unread ? 'font-semibold text-gray-900' : 'text-gray-800'}>{email.subject}</span>
                   {!expanded && <span className="text-gray-400 font-normal"> — {email.preview}</span>}
                 </div>
-                <div className="flex gap-1 flex-wrap justify-end pr-3">
+                <div className="flex gap-1 flex-wrap px-3">
                   {assignedLabels.map(l => <LabelChip key={l.id} label={l} />)}
                 </div>
                 <div className="text-xs text-gray-400 text-right tabular-nums">{email.date}</div>
               </div>
-              {expanded && (
-                <div className="pb-3 pl-4 text-sm text-gray-600 leading-relaxed border-t border-blue-100 pt-2">
-                  {email.preview}
+              <div className={`email-expand${expanded ? ' open' : ''}`}>
+                <div>
+                  <div className="pb-3 pl-4 text-sm text-gray-600 leading-relaxed border-t border-blue-100 pt-2">
+                    {email.preview}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           )
         })}
@@ -1361,11 +1310,6 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="ml-auto">
-          <span className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full">
-            {totalLabels} labels
-          </span>
-        </div>
       </header>
 
       {/* Content */}

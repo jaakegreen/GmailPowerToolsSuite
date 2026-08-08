@@ -51,6 +51,26 @@ html, body, #root {
 }
 
 
+.email-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.email-expand.open {
+  grid-template-rows: 1fr;
+}
+.email-expand > div {
+  overflow: hidden;
+}
+
+@keyframes panel-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.panel-in {
+  animation: panel-in 0.2s ease both;
+}
+
 @keyframes drop-line-in {
   from { opacity: 0; scaleX: 0.8; }
   to   { opacity: 1; scaleX: 1; }
@@ -67,6 +87,15 @@ html, body, #root {
 .btn-primary:hover {
   background-color: #3267cc;
   color: #ffffff;
+}
+
+.btn-batch {
+  background-color: rgb(71, 113, 217);
+  color: #ffffff;
+  transition: background-color 0.25s ease;
+}
+.btn-batch:hover {
+  background-color: rgb(57, 96, 196);
 }
 
 .btn-secondary {

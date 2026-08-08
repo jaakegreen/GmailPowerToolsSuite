@@ -1,0 +1,10 @@
+{
+  "description": "Enhance your Gmail experience with powerful tools for managing labels and visualizing email storage, streamlining organization and efficiency.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
